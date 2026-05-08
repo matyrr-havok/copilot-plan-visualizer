@@ -112,18 +112,116 @@ const STATUS_LABELS = {
     done: "Done",
 };
 
+// ---- Persistent todos overview (status pills + thin progress bar) --------
+//
+// Built ONCE and mutated in place on every push, so the progress bar's
+// flex-grow transition has a previous value to animate from. The cards
+// (groups) live in a separate replaceable #todos-groups container.
+let overviewEl = null;
+let groupsEl = null;
+let overviewPillEls = null;        // {status -> {pill, count, dot, label}}
+let overviewSegEls = null;         // {status -> seg}
+let overviewBarEl = null;
+let overviewCountEl = null;
+
+function buildTodosScaffold() {
+    if (overviewEl) return;
+
+    todosContentEl.innerHTML = "";
+
+    overviewEl = document.createElement("div");
+    overviewEl.id = "todos-overview";
+    overviewEl.setAttribute("role", "region");
+    overviewEl.setAttribute("aria-label", "Todos overview");
+
+    const pillsRow = document.createElement("div");
+    pillsRow.className = "overview-pills";
+    overviewPillEls = Object.create(null);
+    for (const s of STATUS_ORDER) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "overview-pill";
+        btn.dataset.status = s;
+        const dot = document.createElement("span");
+        dot.className = "overview-dot";
+        const count = document.createElement("span");
+        count.className = "count";
+        count.textContent = "0";
+        const label = document.createElement("span");
+        label.className = "label";
+        label.textContent = STATUS_LABELS[s];
+        btn.append(dot, count, label);
+        pillsRow.appendChild(btn);
+        overviewPillEls[s] = { pill: btn, count, dot, label };
+    }
+
+    overviewBarEl = document.createElement("div");
+    overviewBarEl.className = "overview-bar";
+    overviewBarEl.setAttribute("role", "progressbar");
+    overviewSegEls = Object.create(null);
+    for (const s of STATUS_ORDER) {
+        const seg = document.createElement("div");
+        seg.className = "overview-bar-seg";
+        seg.dataset.status = s;
+        seg.style.flexGrow = "0";
+        overviewBarEl.appendChild(seg);
+        overviewSegEls[s] = seg;
+    }
+
+    overviewCountEl = document.createElement("div");
+    overviewCountEl.className = "overview-count";
+    overviewCountEl.textContent = "0 todos";
+
+    overviewEl.append(pillsRow, overviewBarEl, overviewCountEl);
+
+    groupsEl = document.createElement("div");
+    groupsEl.id = "todos-groups";
+
+    todosContentEl.append(overviewEl, groupsEl);
+}
+
+function updateOverview(byStatus, total) {
+    overviewEl.hidden = false;
+    let doneCount = 0;
+    for (const s of STATUS_ORDER) {
+        const n = byStatus.get(s)?.length ?? 0;
+        const ent = overviewPillEls[s];
+        ent.count.textContent = String(n);
+        ent.pill.classList.toggle("is-zero", n === 0);
+        overviewSegEls[s].style.flexGrow = String(n);
+        if (s === "done") doneCount = n;
+    }
+    if (total > 0) {
+        overviewBarEl.setAttribute("aria-valuemin", "0");
+        overviewBarEl.setAttribute("aria-valuemax", String(total));
+        overviewBarEl.setAttribute("aria-valuenow", String(doneCount));
+        overviewBarEl.setAttribute("aria-label", `${doneCount} of ${total} todos done`);
+        overviewCountEl.textContent = `${doneCount} / ${total} done`;
+    } else {
+        overviewBarEl.removeAttribute("aria-valuemin");
+        overviewBarEl.removeAttribute("aria-valuemax");
+        overviewBarEl.removeAttribute("aria-valuenow");
+        overviewBarEl.setAttribute("aria-label", "No todos");
+        overviewCountEl.textContent = "0 todos";
+    }
+}
+
 function renderTodos(state) {
+    buildTodosScaffold();
+
     const todos = state.todos || [];
     const deps = state.deps || [];
 
     if (state.todosError) {
-        todosContentEl.innerHTML = `<div class="todos-error">${escapeHtml(state.todosError)}</div>`;
+        overviewEl.hidden = true;
+        groupsEl.innerHTML = `<div class="todos-error">${escapeHtml(state.todosError)}</div>`;
         todosCountEl.textContent = "";
         todosMetaEl.textContent = state.session?.workspacePath ? "session.db" : "";
         return;
     }
     if (state.todosAvailable === false) {
-        todosContentEl.innerHTML = `<div class="todos-error">better-sqlite3 not loaded — run <code>npm install</code> in the extension dir.</div>`;
+        overviewEl.hidden = true;
+        groupsEl.innerHTML = `<div class="todos-error">better-sqlite3 not loaded — run <code>npm install</code> in the extension dir.</div>`;
         todosCountEl.textContent = "";
         todosMetaEl.textContent = "";
         return;
@@ -132,17 +230,20 @@ function renderTodos(state) {
     todosCountEl.textContent = todos.length ? `(${todos.length})` : "";
     todosMetaEl.textContent = state.session?.workspacePath ? "session.db" : "";
 
-    if (!todos.length) {
-        todosContentEl.innerHTML = `<p class="empty-todos">No todos yet.</p>`;
-        return;
-    }
-
     const byStatus = new Map();
     for (const s of STATUS_ORDER) byStatus.set(s, []);
     for (const t of todos) {
         const s = STATUS_ORDER.includes(t.status) ? t.status : "pending";
         byStatus.get(s).push(t);
     }
+
+    updateOverview(byStatus, todos.length);
+
+    if (!todos.length) {
+        groupsEl.innerHTML = `<p class="empty-todos">No todos yet.</p>`;
+        return;
+    }
+
     const depsByTodo = new Map();
     for (const d of deps) {
         if (!depsByTodo.has(d.todo_id)) depsByTodo.set(d.todo_id, []);
@@ -154,7 +255,7 @@ function renderTodos(state) {
     for (const s of STATUS_ORDER) {
         const items = byStatus.get(s);
         if (!items.length) continue;
-        out.push(`<div class="todo-group">
+        out.push(`<div class="todo-group" data-status="${escapeHtml(s)}">
             <div class="todo-group-header">
                 <span>${escapeHtml(STATUS_LABELS[s])}</span>
                 <span class="pill">${items.length}</span>
@@ -178,7 +279,43 @@ function renderTodos(state) {
         }
         out.push(`</div>`);
     }
-    todosContentEl.innerHTML = out.join("");
+    groupsEl.innerHTML = out.join("");
+}
+
+// Replay a CSS animation that may already be on the element. The
+// remove → reflow → add sequence forces the keyframes to restart so
+// repeat clicks always animate.
+function replayAnimation(el, className) {
+    if (!el) return;
+    el.classList.remove(className);
+    void el.offsetWidth;
+    el.classList.add(className);
+}
+
+const reducedMotionMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+function isReducedMotion() {
+    return !!(reducedMotionMq && reducedMotionMq.matches);
+}
+
+// Delegated pill-click handler — installed once on the persistent
+// #todos-overview, scrolls to the matching group inside #todos-content.
+function handleOverviewPillClick(e) {
+    const pill = e.target?.closest?.(".overview-pill");
+    if (!pill) return;
+    const status = pill.dataset.status;
+    if (!status) return;
+    const group = groupsEl?.querySelector(`.todo-group[data-status="${CSS.escape(status)}"]`);
+    if (!group) {
+        if (!isReducedMotion()) replayAnimation(pill, "shake");
+        return;
+    }
+    const behavior = isReducedMotion() ? "auto" : "smooth";
+    const top = group.offsetTop - todosContentEl.offsetTop;
+    todosContentEl.scrollTo({ top: Math.max(0, top), behavior });
+    if (!isReducedMotion()) {
+        const header = group.querySelector(".todo-group-header");
+        if (header) replayAnimation(header, "pulse-highlight");
+    }
 }
 
 // Expose update API for extension pushes.
@@ -513,5 +650,10 @@ refreshBtn.addEventListener("click", pullState);
 (async () => {
     await initTheme();
     await initLayout();
+    // Build the persistent overview scaffold BEFORE the first pullState,
+    // and install the delegated pill-click handler on it (the overview
+    // element is persistent, so a single listener survives all pushes).
+    buildTodosScaffold();
+    overviewEl.addEventListener("click", handleOverviewPillClick);
     await pullState();
 })();

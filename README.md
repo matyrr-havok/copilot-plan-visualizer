@@ -13,7 +13,10 @@ SQLite DB), updating in real time as you and the agent change either.
   `marked.min.js`; no runtime CDN). Full plan path in the column header.
 - **Right column** — todos grouped by status (In progress → Pending →
   Blocked → Done), each card showing the id, title, optional description
-  and dependency badges (`⟶ other-todo-id`).
+  and dependency badges (`⟶ other-todo-id`). The top of the column is
+  a sticky **at-a-glance overview**: one pill per status with a count,
+  a thin segmented progress bar, and a `<done> / <total> done` summary.
+  Click any pill to smooth-scroll to that group inside the column.
 - **Header** — a pulsing live indicator + the session id and current
   working directory.
 - **Footer** — last update timestamp, internal version counter, active

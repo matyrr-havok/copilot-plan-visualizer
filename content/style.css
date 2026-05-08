@@ -258,6 +258,115 @@ body.dragging-splitter * { cursor: col-resize !important; }
     font-size: 12px;
 }
 
+/* ---- Todos overview (status pills + progress bar) -------------------- */
+#todos-overview {
+    /* Sticky so the pills + bar stay visible when scrolling a long list. */
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--panel-bg, #1e1e1e);
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border, #333);
+}
+.overview-pills {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-bottom: 6px;
+}
+.overview-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--pill-bg, #3a3a3a);
+    color: var(--pill-fg, #ddd);
+    border: 1px solid var(--border, #444);
+    border-radius: 12px;
+    padding: 2px 10px 2px 8px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+.overview-pill:hover {
+    background: var(--menu-hover-bg, var(--accent, #0e639c));
+    color: var(--button-fg-hover, #fff);
+}
+.overview-pill:focus-visible {
+    outline: 2px solid var(--accent, #4ec9b0);
+    outline-offset: 2px;
+}
+.overview-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    /* Defensive reset: there's a global `.dot` rule for the topbar
+       live indicator that adds box-shadow + animation. We use a
+       different class name AND reset here in case a theme adds rules. */
+    box-shadow: none;
+    animation: none;
+}
+.overview-pill .count { font-weight: 600; font-size: 11.5px; }
+.overview-pill .label { opacity: 0.85; font-size: 11px; }
+.overview-pill[data-status="in_progress"] .overview-dot { background: var(--status-in_progress, #d7ba7d); }
+.overview-pill[data-status="pending"]     .overview-dot { background: var(--status-pending, #569cd6); }
+.overview-pill[data-status="blocked"]     .overview-dot { background: var(--status-blocked, #f48771); }
+.overview-pill[data-status="done"]        .overview-dot { background: var(--status-done, #4ec9b0); }
+/* Dim only the dot + label on zero pills — keep the count number and
+   the button container fully legible (especially for keyboard focus
+   on light themes). */
+.overview-pill.is-zero .overview-dot,
+.overview-pill.is-zero .label { opacity: 0.45; }
+
+.overview-bar {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: transparent;
+    border: 1px solid var(--border, #333);
+    box-sizing: border-box;
+}
+.overview-bar-seg {
+    flex-basis: 0;
+    transition: flex-grow 250ms ease;
+}
+.overview-bar-seg[data-status="in_progress"] { background: var(--status-in_progress, #d7ba7d); }
+.overview-bar-seg[data-status="pending"]     { background: var(--status-pending, #569cd6); }
+.overview-bar-seg[data-status="blocked"]     { background: var(--status-blocked, #f48771); }
+.overview-bar-seg[data-status="done"]        { background: var(--status-done, #4ec9b0); }
+
+.overview-count {
+    text-align: right;
+    color: var(--fg-muted, #888);
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* Smooth-scroll target offset since the overview is sticky and would
+   otherwise sit on top of the group header it scrolled to. */
+.todo-group { scroll-margin-top: 80px; }
+
+/* Pulse the target group's header when its overview pill is clicked. */
+.todo-group-header.pulse-highlight {
+    animation: group-pulse 0.6s ease;
+}
+@keyframes group-pulse {
+    0%   { background: transparent; }
+    30%  { background: var(--menu-hover-bg, var(--accent, #0e639c)); }
+    100% { background: transparent; }
+}
+
+/* Shake an overview pill when its target group has zero items. */
+.overview-pill.shake { animation: pill-shake 0.3s ease; }
+@keyframes pill-shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-3px); }
+    75%      { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .overview-bar-seg,
+    .todo-group-header.pulse-highlight,
+    .overview-pill.shake,
+    .overview-pill { transition: none; animation: none; }
+}
+
 /* ---- Footer ----------------------------------------------------------- */
 #bottombar {
     display: flex; justify-content: space-between; align-items: center;
