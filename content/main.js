@@ -310,7 +310,13 @@ function handleOverviewPillClick(e) {
         return;
     }
     const behavior = isReducedMotion() ? "auto" : "smooth";
-    const top = group.offsetTop - todosContentEl.offsetTop;
+    // Subtract the overview's height so the group lands just BELOW the
+    // sticky overlay, not behind it. Measured at click time because the
+    // overview is variable-height (the bar wraps when pills wrap on a
+    // narrow column). 4px breathing room so the group header isn't
+    // flush against the overview's bottom border.
+    const stickyOffset = (overviewEl?.offsetHeight || 0) + 4;
+    const top = group.offsetTop - todosContentEl.offsetTop - stickyOffset;
     todosContentEl.scrollTo({ top: Math.max(0, top), behavior });
     if (!isReducedMotion()) {
         const header = group.querySelector(".todo-group-header");

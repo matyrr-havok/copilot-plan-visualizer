@@ -259,15 +259,40 @@ body.dragging-splitter * { cursor: col-resize !important; }
 }
 
 /* ---- Todos overview (status pills + progress bar) -------------------- */
+/* The todos pane scrolls. The sticky overview must extend to the actual
+   top of the scroll viewport with no transparent gap, otherwise scrolled
+   items become visible behind the pills/bar. To achieve that we strip
+   the `.pane-body` padding from the todos scroll container and reapply
+   it on the inner overview + groups elements, so the visual layout
+   stays identical but the sticky element can sit flush with the top. */
+#todos-pane > #todos-content {
+    padding: 0;
+}
 #todos-overview {
     /* Sticky so the pills + bar stay visible when scrolling a long list. */
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--panel-bg, #1e1e1e);
-    padding-bottom: 8px;
-    margin-bottom: 8px;
+    /* Re-applied inset so the layout matches what `.pane-body` provided.
+       Bottom is intentionally small (2px) because `#todos-groups` adds its
+       own 14px top — together with the 1px border-bottom they keep the
+       total gap between the bar and the first group header at ~16px,
+       matching the pre-fix `padding-bottom: 8px` + `margin-bottom: 8px`. */
+    padding: 14px 16px 2px 16px;
     border-bottom: 1px solid var(--border, #333);
+}
+#todos-groups {
+    /* Top is 14px (not 8px) so that when the overview is hidden — which
+       happens in the `todosError` / `todosAvailable === false` branches in
+       `content/main.js` — the error message keeps the same top inset
+       `.pane-body` would have given it. */
+    padding: 14px 16px;
+}
+/* The initial-load placeholder is a direct child of #todos-content before
+   `buildTodosScaffold()` runs. Re-add the inset it lost. */
+#todos-content > .placeholder {
+    margin: 14px 16px;
 }
 .overview-pills {
     display: flex; flex-wrap: wrap; gap: 6px;
@@ -338,9 +363,11 @@ body.dragging-splitter * { cursor: col-resize !important; }
     margin-top: 4px;
 }
 
-/* Smooth-scroll target offset since the overview is sticky and would
-   otherwise sit on top of the group header it scrolled to. */
-.todo-group { scroll-margin-top: 80px; }
+/* The pill-click handler measures `#todos-overview`'s height at click
+   time and subtracts it from the scroll target, so the group header
+   lands just below the sticky overlay. Hard-coded `scroll-margin-top`
+   is intentionally NOT used here: it's only consulted by
+   `scrollIntoView()` and CSS scroll-snap, both of which we avoid. */
 
 /* Pulse the target group's header when its overview pill is clicked. */
 .todo-group-header.pulse-highlight {
