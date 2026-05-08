@@ -1,0 +1,22 @@
+{
+  "name": "copilot-plan-visualizer",
+  "version": "0.1.0",
+  "description": "GitHub Copilot CLI extension that opens a webview rendering the current session's plan and todo state, updating in real time.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "author": "Paco Vidal",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pacovidal/copilot-plan-visualizer.git"
+  },
+  "dependencies": {
+    "@webviewjs/webview": "^0.1.4",
+    "better-sqlite3": "^12.5.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
+

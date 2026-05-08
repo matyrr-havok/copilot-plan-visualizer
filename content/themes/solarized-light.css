@@ -1,0 +1,26 @@
+:root {
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --fg-muted: #93a1a1;
+    --panel-bg: #fdf6e3;
+    --header-bg: #eee8d5;
+    --subheader-bg: #e8e2cc;
+    --border: #d6cfba;
+    --accent: #2aa198;
+    --button-bg: #eee8d5;
+    --button-bg-hover: #2aa198;
+    --button-fg-hover: #fdf6e3;
+    --code-bg: #eee8d5;
+    --card-bg: #ffffff;
+    --card-border: #93a1a1;
+    --pill-bg: #e8e2cc;
+    --pill-fg: #586e75;
+    --badge-bg: #eee8d5;
+    --badge-fg: #586e75;
+    --menu-bg: #ffffff;
+    --menu-hover-bg: #2aa198;
+    --status-in_progress: #b58900;
+    --status-pending: #268bd2;
+    --status-done: #859900;
+    --status-blocked: #dc322f;
+}

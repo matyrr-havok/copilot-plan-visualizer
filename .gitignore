@@ -1,0 +1,16 @@
+node_modules/
+package-lock.json
+.copilot/
+
+# User themes directory (created at runtime when install.ps1 places this
+# checkout as the installed extension, or by the user dropping CSS files
+# in it). Built-in themes live in content/themes/ and ARE tracked.
+/themes/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vs/
+.vscode/
+.idea/
+*.log

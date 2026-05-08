@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Plan Visualizer</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="themes/default-dark.css" />
+<style id="active-theme"></style>
+<script src="/__bridge.js"></script>
+<script src="vendor/marked.min.js"></script>
+</head>
+<body class="layout-loading">
+  <header id="topbar">
+    <div class="title">
+      <span class="dot" id="live-dot" title="Live"></span>
+      <strong>Plan Visualizer</strong>
+    </div>
+    <div class="meta">
+      <span id="session-info" class="session-info"></span>
+    </div>
+    <div class="controls">
+      <button id="refresh-btn" title="Force refresh from disk">Refresh</button>
+    </div>
+  </header>
+  <main id="layout" data-layout="both">
+    <section id="plan-pane" class="pane">
+      <div class="pane-header">
+        <h2>plan.md</h2>
+        <span id="plan-path" class="path"></span>
+      </div>
+      <div id="plan-content" class="pane-body markdown">
+        <p class="placeholder">Loading…</p>
+      </div>
+    </section>
+    <div id="splitter" title="Drag to resize" aria-label="Resize split between plan and todos"></div>
+    <section id="todos-pane" class="pane">
+      <div class="pane-header">
+        <h2>Todos <span id="todos-count" class="count"></span></h2>
+        <span id="todos-meta" class="path"></span>
+      </div>
+      <div id="todos-content" class="pane-body">
+        <p class="placeholder">Loading…</p>
+      </div>
+    </section>
+    <div id="empty-state">
+      <div class="empty-state-inner">
+        <p>Both panes are hidden.</p>
+        <p class="hint">Right-click anywhere to show them again.</p>
+      </div>
+    </div>
+  </main>
+  <footer id="bottombar">
+    <span id="footer-status">Connecting…</span>
+    <span id="footer-theme"></span>
+  </footer>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
