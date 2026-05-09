@@ -1,3 +1,17 @@
+/* Default Dark — VS Code-inspired baseline.
+   Variable contract (all themes must define these):
+     Backgrounds: --bg, --panel-bg, --header-bg, --subheader-bg,
+                  --code-bg, --card-bg, --menu-bg
+     Foregrounds: --fg, --fg-muted
+     Borders:     --border, --card-border
+     Buttons:     --button-bg, --button-bg-hover, --button-fg-hover,
+                  --menu-hover-bg
+     Pills/badges:--pill-bg, --pill-fg, --badge-bg, --badge-fg
+     Status bar:  --status-bg (accent fill), --status-fg (text on accent)
+     Live dot:    --accent
+     Todo statuses: --status-in_progress, --status-pending,
+                  --status-done, --status-blocked
+*/
 :root {
     --bg: #1e1e1e;
     --fg: #d4d4d4;
@@ -19,6 +33,8 @@
     --badge-fg: #cccccc;
     --menu-bg: #2d2d2d;
     --menu-hover-bg: #094771;
+    --status-bg: #007acc;
+    --status-fg: #ffffff;
     --status-in_progress: #d7ba7d;
     --status-pending: #569cd6;
     --status-done: #4ec9b0;

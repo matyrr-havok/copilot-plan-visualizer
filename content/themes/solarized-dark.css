@@ -1,3 +1,5 @@
+/* Solarized Dark — by Ethan Schoonover.
+   https://ethanschoonover.com/solarized/ */
 :root {
     --bg: #002b36;
     --fg: #93a1a1;
@@ -19,6 +21,8 @@
     --badge-fg: #93a1a1;
     --menu-bg: #073642;
     --menu-hover-bg: #2aa198;
+    --status-bg: #073642;
+    --status-fg: #ffffff;
     --status-in_progress: #b58900;
     --status-pending: #268bd2;
     --status-done: #859900;

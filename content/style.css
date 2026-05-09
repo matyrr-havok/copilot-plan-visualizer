@@ -22,10 +22,9 @@ body {
     background: var(--header-bg, var(--panel-bg, #252526));
     border-bottom: 1px solid var(--border, #333);
 }
-#topbar .title { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+#topbar .title { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
 #topbar .title strong { font-weight: 600; letter-spacing: 0.2px; }
-#topbar .meta { flex: 1 1 auto; min-width: 0; color: var(--fg-muted, #888); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#topbar .controls { display: flex; gap: 8px; }
+#topbar .controls { display: flex; gap: 8px; flex: 0 0 auto; }
 #topbar button {
     background: var(--button-bg, #333);
     color: var(--fg, #d4d4d4);
@@ -142,7 +141,21 @@ body.dragging-splitter * { cursor: col-resize !important; }
 }
 .pane-header h2 { font-size: 13px; margin: 0; font-weight: 600; }
 .pane-header .count { color: var(--fg-muted, #888); font-weight: 400; }
-.pane-header .path { color: var(--fg-muted, #888); font-size: 11px; font-family: var(--font-mono, Consolas, "Courier New", monospace); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-header .updated {
+    color: var(--fg-muted, #888);
+    font-size: 11px;
+    font-family: var(--font-mono, Consolas, "Courier New", monospace);
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pane-header .updated:empty { display: none; }
+/* Pane headers carry a `title=...` showing the plan path / DB path so
+   hovering anywhere in the header reveals it. The cursor hints at it. */
+.pane-header { cursor: help; }
 .pane-body { flex: 1 1 auto; overflow: auto; padding: 14px 16px; }
 .placeholder { color: var(--fg-muted, #888); font-style: italic; }
 
@@ -395,14 +408,40 @@ body.dragging-splitter * { cursor: col-resize !important; }
 }
 
 /* ---- Footer ----------------------------------------------------------- */
+/* Accent-coloured status bar (theme-defined --status-bg + --status-fg) so it
+   pops away from the panes, in the same style as `copilot-ps-console-view`.
+   Light/dark theme variants pick contrasting `--status-fg` accordingly. */
 #bottombar {
     display: flex; justify-content: space-between; align-items: center;
+    flex: 0 0 auto;
     padding: 4px 14px;
-    background: var(--header-bg, var(--panel-bg, #252526));
+    gap: 14px;
+    background: var(--status-bg, var(--header-bg, #007acc));
+    color: var(--status-fg, #ffffff);
     border-top: 1px solid var(--border, #333);
     font-size: 11px;
-    color: var(--fg-muted, #888);
+    min-width: 0;
 }
+#bottombar .session-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+}
+#bottombar .session-info:empty { display: none; }
+#bottombar .cwd-info {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: default;
+    font-family: var(--font-mono, Consolas, "Courier New", monospace);
+    max-width: 60%;
+}
+#bottombar .cwd-info:empty { display: none; }
 
 /* ---- Right-click context menu ---------------------------------------- */
 #context-menu, #theme-submenu {

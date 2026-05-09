@@ -1,0 +1,31 @@
+/* One Half Dark — by Son A. Pham.
+   Bundled with Atom and ported widely; included by Windows Terminal.
+   https://github.com/sonph/onehalf */
+:root {
+    --bg: #282c34;
+    --fg: #dcdfe4;
+    --fg-muted: #5d6478;
+    --panel-bg: #282c34;
+    --header-bg: #313640;
+    --subheader-bg: #353a44;
+    --border: #313640;
+    --accent: #98c379;
+    --button-bg: #353a44;
+    --button-bg-hover: #61afef;
+    --button-fg-hover: #282c34;
+    --code-bg: #2c313a;
+    --card-bg: #2c313a;
+    --card-border: #5d6478;
+    --pill-bg: #353a44;
+    --pill-fg: #dcdfe4;
+    --badge-bg: #2c313a;
+    --badge-fg: #dcdfe4;
+    --menu-bg: #353a44;
+    --menu-hover-bg: #61afef;
+    --status-bg: #61afef;
+    --status-fg: #282c34;
+    --status-in_progress: #e5c07b;
+    --status-pending: #61afef;
+    --status-done: #98c379;
+    --status-blocked: #e06c75;
+}

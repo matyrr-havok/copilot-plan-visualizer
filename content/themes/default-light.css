@@ -1,3 +1,4 @@
+/* Default Light — GitHub Primer-inspired light theme. */
 :root {
     --bg: #fafafa;
     --fg: #1f2328;
@@ -19,6 +20,8 @@
     --badge-fg: #57606a;
     --menu-bg: #ffffff;
     --menu-hover-bg: #0969da;
+    --status-bg: #0969da;
+    --status-fg: #ffffff;
     --status-in_progress: #bf8700;
     --status-pending: #0969da;
     --status-done: #1a7f37;

@@ -15,9 +15,6 @@
       <span class="dot" id="live-dot" title="Live"></span>
       <strong>Plan Visualizer</strong>
     </div>
-    <div class="meta">
-      <span id="session-info" class="session-info"></span>
-    </div>
     <div class="controls">
       <button id="refresh-btn" title="Force refresh from disk">Refresh</button>
     </div>
@@ -25,8 +22,8 @@
   <main id="layout" data-layout="both">
     <section id="plan-pane" class="pane">
       <div class="pane-header">
-        <h2>plan.md</h2>
-        <span id="plan-path" class="path"></span>
+        <h2>Plan</h2>
+        <span id="plan-updated" class="updated"></span>
       </div>
       <div id="plan-content" class="pane-body markdown">
         <p class="placeholder">Loading…</p>
@@ -36,7 +33,7 @@
     <section id="todos-pane" class="pane">
       <div class="pane-header">
         <h2>Todos <span id="todos-count" class="count"></span></h2>
-        <span id="todos-meta" class="path"></span>
+        <span id="todos-updated" class="updated"></span>
       </div>
       <div id="todos-content" class="pane-body">
         <p class="placeholder">Loading…</p>
@@ -50,8 +47,8 @@
     </div>
   </main>
   <footer id="bottombar">
-    <span id="footer-status">Connecting…</span>
-    <span id="footer-theme"></span>
+    <span id="session-info" class="session-info"></span>
+    <span id="cwd-info" class="cwd-info"></span>
   </footer>
   <script type="module" src="/main.js"></script>
 </body>

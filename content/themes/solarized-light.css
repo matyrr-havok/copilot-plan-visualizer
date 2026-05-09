@@ -1,3 +1,5 @@
+/* Solarized Light — by Ethan Schoonover.
+   https://ethanschoonover.com/solarized/ */
 :root {
     --bg: #fdf6e3;
     --fg: #586e75;
@@ -19,6 +21,8 @@
     --badge-fg: #586e75;
     --menu-bg: #ffffff;
     --menu-hover-bg: #2aa198;
+    --status-bg: #073642;
+    --status-fg: #ffffff;
     --status-in_progress: #b58900;
     --status-pending: #268bd2;
     --status-done: #859900;

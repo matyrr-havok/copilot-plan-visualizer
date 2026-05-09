@@ -5,19 +5,27 @@
 // `webview.eval`). Stale pushes (lower `version`) are ignored.
 
 const planContentEl = document.getElementById("plan-content");
-const planPathEl = document.getElementById("plan-path");
+const planHeaderEl = document.querySelector("#plan-pane .pane-header");
+const planUpdatedEl = document.getElementById("plan-updated");
 const todosContentEl = document.getElementById("todos-content");
 const todosCountEl = document.getElementById("todos-count");
-const todosMetaEl = document.getElementById("todos-meta");
+const todosHeaderEl = document.querySelector("#todos-pane .pane-header");
+const todosUpdatedEl = document.getElementById("todos-updated");
 const sessionInfoEl = document.getElementById("session-info");
-const footerStatusEl = document.getElementById("footer-status");
-const footerThemeEl = document.getElementById("footer-theme");
+const cwdInfoEl = document.getElementById("cwd-info");
 const liveDot = document.getElementById("live-dot");
 const refreshBtn = document.getElementById("refresh-btn");
 const activeStyleEl = document.getElementById("active-theme");
 
 let lastVersion = -1;
 let lastState = null;
+
+// Per-section content fingerprints so we can show distinct "Updated HH:MM:SS"
+// labels on each pane header — a SQL todo insert bumps only the Todos
+// timestamp, an external plan.md edit bumps only the Plan timestamp, and the
+// 5s DB-poll backstop never bumps either because the hash doesn't change.
+let lastPlanHash = null;
+let lastTodosHash = null;
 
 // ---- Markdown rendering + sanitisation -----------------------------------
 
@@ -76,32 +84,67 @@ function applyState(state) {
     lastVersion = state.version;
     lastState = state;
 
-    // Header / session info
+    // Footer — session name (left) + cwd [⎇ branch] (right). Empty spans are
+    // hidden via CSS, mirroring copilot-ps-console-view's footer pattern.
     const sess = state.session || {};
-    const sid = sess.id ? `${sess.id.slice(0, 8)}…` : "(no session id)";
-    sessionInfoEl.textContent = `${sid}   ·   ${sess.cwd || ""}`;
-    sessionInfoEl.title = `session ${sess.id || ""}\ncwd ${sess.cwd || ""}\nworkspace ${sess.workspacePath || ""}`;
+    const sid = sess.id || "";
+    const name = typeof sess.name === "string" && sess.name.trim() ? sess.name.trim() : null;
+    if (name) {
+        sessionInfoEl.textContent = `Session: '${name}'`;
+        if (sid) sessionInfoEl.title = sid;
+        else sessionInfoEl.removeAttribute("title");
+    } else if (sid) {
+        sessionInfoEl.textContent = `Session: ${sid}`;
+        sessionInfoEl.title = sid;
+    } else {
+        sessionInfoEl.textContent = "";
+        sessionInfoEl.removeAttribute("title");
+    }
+    const branchPart = sess.branch ? `[⎇ ${sess.branch}]` : "";
+    cwdInfoEl.textContent = [sess.cwd || "", branchPart].filter(Boolean).join(" ");
 
-    // Plan
+    // Plan — content + tooltip on the header. The "Updated HH:MM:SS" label
+    // is set only when the plan hash actually changes.
     if (state.plan?.exists && typeof state.plan.content === "string") {
         planContentEl.innerHTML = renderMarkdown(state.plan.content);
     } else {
         planContentEl.innerHTML = `<p class="placeholder">No plan yet. The agent will create one when you ask for a plan.</p>`;
     }
-    planPathEl.textContent = state.plan?.path || "";
-    planPathEl.title = state.plan?.path || "";
+    const planPath = state.plan?.path || "";
+    planHeaderEl.title = planPath || "(no plan path)";
+    const planHash = JSON.stringify({ exists: !!state.plan?.exists, content: state.plan?.content ?? null });
+    if (planHash !== lastPlanHash) {
+        lastPlanHash = planHash;
+        planUpdatedEl.textContent = formatUpdatedTime(state.timestamp);
+    }
 
-    // Todos
+    // Todos — render groups + overview, then bump the per-section timestamp
+    // only when the todo content fingerprint actually changes.
     renderTodos(state);
-
-    // Footer
-    const ts = new Date(state.timestamp || Date.now()).toLocaleTimeString();
-    footerStatusEl.textContent = `Updated ${ts}   ·   v${state.version}`;
+    todosHeaderEl.title = state.todosDbPath || "(no workspace path)";
+    const todosHash = JSON.stringify({
+        todos: state.todos || [],
+        deps: state.deps || [],
+        err: state.todosError || null,
+        avail: state.todosAvailable !== false,
+    });
+    if (todosHash !== lastTodosHash) {
+        lastTodosHash = todosHash;
+        todosUpdatedEl.textContent = formatUpdatedTime(state.timestamp);
+    }
 
     // Pulse the live dot
     liveDot.classList.remove("pulse");
     void liveDot.offsetWidth;
     liveDot.classList.add("pulse");
+}
+
+function formatUpdatedTime(iso) {
+    let d;
+    try { d = new Date(iso || Date.now()); }
+    catch { d = new Date(); }
+    if (Number.isNaN(d.getTime())) d = new Date();
+    return `Updated ${d.toLocaleTimeString()}`;
 }
 
 const STATUS_ORDER = ["in_progress", "pending", "blocked", "done"];
@@ -216,19 +259,16 @@ function renderTodos(state) {
         overviewEl.hidden = true;
         groupsEl.innerHTML = `<div class="todos-error">${escapeHtml(state.todosError)}</div>`;
         todosCountEl.textContent = "";
-        todosMetaEl.textContent = state.session?.workspacePath ? "session.db" : "";
         return;
     }
     if (state.todosAvailable === false) {
         overviewEl.hidden = true;
         groupsEl.innerHTML = `<div class="todos-error">better-sqlite3 not loaded — run <code>npm install</code> in the extension dir.</div>`;
         todosCountEl.textContent = "";
-        todosMetaEl.textContent = "";
         return;
     }
 
     todosCountEl.textContent = todos.length ? `(${todos.length})` : "";
-    todosMetaEl.textContent = state.session?.workspacePath ? "session.db" : "";
 
     const byStatus = new Map();
     for (const s of STATUS_ORDER) byStatus.set(s, []);
@@ -332,17 +372,28 @@ window.__plan = { update: applyState };
 let themesCache = null;
 let activeThemeName = null;
 
+// Refresh the theme list from the extension every time the submenu opens
+// so users can drop a CSS file into their themes dir and see it appear by
+// reopening the menu — no reload needed (mirrors copilot-ps-console-view).
+// We only overwrite themesCache on success: a transient WS failure on a
+// later refresh shouldn't wipe the working list we already have.
+async function refreshThemes() {
+    try {
+        const next = await copilot.listThemes();
+        if (Array.isArray(next)) themesCache = next;
+    } catch { /* keep last good cache, if any */ }
+    return themesCache || [];
+}
+
+// Initial-only path. The theme submenu always uses refreshThemes() instead.
 async function ensureThemes() {
     if (themesCache) return themesCache;
-    try { themesCache = await copilot.listThemes(); }
-    catch { themesCache = []; }
-    return themesCache;
+    return refreshThemes();
 }
 
 function applyTheme(name, css, mode) {
     activeThemeName = name;
     activeStyleEl.textContent = css;
-    footerThemeEl.textContent = `Theme: ${name}`;
     copilot.setThemeChoice({ name, mode }).catch(() => {});
 }
 
@@ -521,29 +572,33 @@ function renderThemeSubmenu(themes) {
         themeSubmenu.appendChild(empty);
         return;
     }
-    const dark = themes.filter((t) => t.mode === "dark");
-    const light = themes.filter((t) => t.mode !== "dark");
-    const addGroup = (label, items) => {
-        if (!items.length) return;
+    // Group by source — built-ins first, user overrides below a separator.
+    // Mode (light/dark) is no longer used to group; all themes appear in
+    // a single alphabetical list per section. Anything that's neither
+    // "builtin" nor "user" is treated as built-in (graceful fallback for
+    // any future source value).
+    const userThemes = themes.filter((t) => t.source === "user").sort((a, b) => a.name.localeCompare(b.name));
+    const builtins = themes.filter((t) => t.source !== "user").sort((a, b) => a.name.localeCompare(b.name));
+    const addPill = (t) => {
+        const btn = document.createElement("button");
+        btn.dataset.theme = t.name;
+        const checked = t.name === activeThemeName;
+        btn.textContent = (checked ? "✓ " : "  ") + t.name;
+        themeSubmenu.appendChild(btn);
+    };
+    for (const t of builtins) addPill(t);
+    if (userThemes.length) {
+        if (builtins.length) {
+            const sep = document.createElement("div");
+            sep.className = "separator";
+            themeSubmenu.appendChild(sep);
+        }
         const lbl = document.createElement("div");
         lbl.className = "label";
-        lbl.textContent = label;
+        lbl.textContent = "User";
         themeSubmenu.appendChild(lbl);
-        for (const t of items) {
-            const btn = document.createElement("button");
-            btn.dataset.theme = t.name;
-            const checked = t.name === activeThemeName;
-            btn.textContent = (checked ? "✓ " : "  ") + t.name;
-            themeSubmenu.appendChild(btn);
-        }
-    };
-    addGroup("Dark", dark);
-    if (dark.length && light.length) {
-        const sep = document.createElement("div");
-        sep.className = "separator";
-        themeSubmenu.appendChild(sep);
+        for (const t of userThemes) addPill(t);
     }
-    addGroup("Light", light);
 }
 
 function showThemeSubmenu(anchorRect) {
@@ -590,7 +645,7 @@ contextMenu.addEventListener("click", async (e) => {
     }
     if (action === "theme") {
         if (themeSubmenu.hidden) {
-            const themes = await ensureThemes();
+            const themes = await refreshThemes();
             renderThemeSubmenu(themes);
             showThemeSubmenu(btn.getBoundingClientRect());
         } else {
@@ -647,7 +702,10 @@ async function pullState() {
         const state = await copilot.getState();
         applyState(state);
     } catch (e) {
-        footerStatusEl.textContent = `Error: ${e?.message || e}`;
+        // The page logs to the extension via copilot.log instead of
+        // overwriting any visible UI element — the footer is now reserved
+        // for session/cwd info, not transient status.
+        try { await copilot.log(`pullState error: ${e?.message || e}`, { level: "warning" }); } catch {}
     }
 }
 

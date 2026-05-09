@@ -1,0 +1,30 @@
+/* Campbell — Windows Terminal's default colour scheme.
+   ANSI palette at https://github.com/microsoft/terminal/blob/main/src/cascadia/TerminalSettingsModel/defaults.json */
+:root {
+    --bg: #0c0c0c;
+    --fg: #cccccc;
+    --fg-muted: #767676;
+    --panel-bg: #0c0c0c;
+    --header-bg: #1a1a1a;
+    --subheader-bg: #222222;
+    --border: #2d2d2d;
+    --accent: #13a10e;
+    --button-bg: #2d2d2d;
+    --button-bg-hover: #094771;
+    --button-fg-hover: #ffffff;
+    --code-bg: #1e1e1e;
+    --card-bg: #161616;
+    --card-border: #3c3c3c;
+    --pill-bg: #2d2d2d;
+    --pill-fg: #cccccc;
+    --badge-bg: #1e1e1e;
+    --badge-fg: #cccccc;
+    --menu-bg: #252526;
+    --menu-hover-bg: #094771;
+    --status-bg: #0037da;
+    --status-fg: #ffffff;
+    --status-in_progress: #c19c00;
+    --status-pending: #3b78ff;
+    --status-done: #13a10e;
+    --status-blocked: #c50f1f;
+}

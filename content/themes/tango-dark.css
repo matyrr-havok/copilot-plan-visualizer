@@ -1,0 +1,30 @@
+/* Tango Dark — the GNOME Tango palette adapted for terminals.
+   https://en.wikipedia.org/wiki/Tango_Desktop_Project */
+:root {
+    --bg: #000000;
+    --fg: #d3d7cf;
+    --fg-muted: #555753;
+    --panel-bg: #000000;
+    --header-bg: #1a1a1a;
+    --subheader-bg: #222222;
+    --border: #1a1a1a;
+    --accent: #8ae234;
+    --button-bg: #2c2c2c;
+    --button-bg-hover: #3465a4;
+    --button-fg-hover: #ffffff;
+    --code-bg: #181818;
+    --card-bg: #141414;
+    --card-border: #555753;
+    --pill-bg: #2c2c2c;
+    --pill-fg: #d3d7cf;
+    --badge-bg: #1a1a1a;
+    --badge-fg: #d3d7cf;
+    --menu-bg: #2c2c2c;
+    --menu-hover-bg: #3465a4;
+    --status-bg: #3465a4;
+    --status-fg: #ffffff;
+    --status-in_progress: #c4a000;
+    --status-pending: #729fcf;
+    --status-done: #8ae234;
+    --status-blocked: #cc0000;
+}

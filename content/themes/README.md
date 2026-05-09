@@ -43,10 +43,10 @@ missing, so a minimal theme can set just `--bg`, `--fg`, `--accent`,
 | --- | --- |
 | `--bg` | Page background |
 | `--fg` | Body text |
-| `--fg-muted` | Secondary / dimmed text (paths, footer, hints) |
+| `--fg-muted` | Secondary / dimmed text (paths, hints, header timestamps) |
 | `--accent` | Primary accent (live dot, splitter hover, links, focus) |
 | `--border` | Pane borders, separators, splitter idle colour |
-| `--header-bg` | Top bar + footer background |
+| `--header-bg` | Top bar background (the footer uses `--status-bg` instead) |
 | `--subheader-bg` | Pane header background (column titles) |
 | `--panel-bg` | Pane body background |
 | `--code-bg` | Inline `code` and `pre` backgrounds |
@@ -61,6 +61,8 @@ missing, so a minimal theme can set just `--bg`, `--fg`, `--accent`,
 | `--pill-fg` | Status group count pill text |
 | `--badge-bg` | Dependency badge background |
 | `--badge-fg` | Dependency badge text |
+| `--status-bg` | Footer (status bar) background — typically a strong accent |
+| `--status-fg` | Footer (status bar) text — must contrast against `--status-bg` |
 | `--status-in_progress` | Left edge + group label colour, todos in progress |
 | `--status-pending` | Left edge + group label colour, pending todos |
 | `--status-done` | Left edge + group label colour, completed todos |
@@ -96,6 +98,8 @@ values, and pick **My Theme** from the right-click → Theme submenu.
     --badge-fg: #c0caf5;
     --menu-bg: #1f2335;
     --menu-hover-bg: #7aa2f7;
+    --status-bg: #7aa2f7;
+    --status-fg: #1a1b26;
     --status-in_progress: #e0af68;
     --status-pending: #7aa2f7;
     --status-done: #9ece6a;
