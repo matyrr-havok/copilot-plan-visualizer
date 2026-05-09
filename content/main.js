@@ -127,6 +127,7 @@ function applyState(state) {
         deps: state.deps || [],
         err: state.todosError || null,
         avail: state.todosAvailable !== false,
+        missing: !!state.todosDbMissing,
     });
     if (todosHash !== lastTodosHash) {
         lastTodosHash = todosHash;
@@ -175,7 +176,7 @@ function buildTodosScaffold() {
     overviewEl = document.createElement("div");
     overviewEl.id = "todos-overview";
     overviewEl.setAttribute("role", "region");
-    overviewEl.setAttribute("aria-label", "Todos overview");
+    overviewEl.setAttribute("aria-label", "To-dos overview");
 
     const pillsRow = document.createElement("div");
     pillsRow.className = "overview-pills";
@@ -213,7 +214,7 @@ function buildTodosScaffold() {
 
     overviewCountEl = document.createElement("div");
     overviewCountEl.className = "overview-count";
-    overviewCountEl.textContent = "0 todos";
+    overviewCountEl.textContent = "0 to-dos";
 
     overviewEl.append(pillsRow, overviewBarEl, overviewCountEl);
 
@@ -238,14 +239,14 @@ function updateOverview(byStatus, total) {
         overviewBarEl.setAttribute("aria-valuemin", "0");
         overviewBarEl.setAttribute("aria-valuemax", String(total));
         overviewBarEl.setAttribute("aria-valuenow", String(doneCount));
-        overviewBarEl.setAttribute("aria-label", `${doneCount} of ${total} todos done`);
+        overviewBarEl.setAttribute("aria-label", `${doneCount} of ${total} to-dos done`);
         overviewCountEl.textContent = `${doneCount} / ${total} done`;
     } else {
         overviewBarEl.removeAttribute("aria-valuemin");
         overviewBarEl.removeAttribute("aria-valuemax");
         overviewBarEl.removeAttribute("aria-valuenow");
-        overviewBarEl.setAttribute("aria-label", "No todos");
-        overviewCountEl.textContent = "0 todos";
+        overviewBarEl.setAttribute("aria-label", "No to-dos");
+        overviewCountEl.textContent = "0 to-dos";
     }
 }
 
@@ -267,6 +268,14 @@ function renderTodos(state) {
         todosCountEl.textContent = "";
         return;
     }
+    if (state.todosDbMissing) {
+        // Friendly empty state: the agent simply hasn't created the
+        // session DB (or the todos/todo_deps tables) yet. Not an error.
+        overviewEl.hidden = true;
+        groupsEl.innerHTML = `<p class="empty-todos">No session database yet. No to-dos.</p>`;
+        todosCountEl.textContent = "";
+        return;
+    }
 
     todosCountEl.textContent = todos.length ? `(${todos.length})` : "";
 
@@ -280,7 +289,7 @@ function renderTodos(state) {
     updateOverview(byStatus, todos.length);
 
     if (!todos.length) {
-        groupsEl.innerHTML = `<p class="empty-todos">No todos yet.</p>`;
+        groupsEl.innerHTML = `<p class="empty-todos">No to-dos yet.</p>`;
         return;
     }
 
@@ -555,7 +564,7 @@ function renderContextMenu() {
     };
 
     add("toggle:showPlan", "Show plan", { checked: layoutState.showPlan, indent: true });
-    add("toggle:showTodos", "Show todos", { checked: layoutState.showTodos, indent: true });
+    add("toggle:showTodos", "Show to-dos", { checked: layoutState.showTodos, indent: true });
     add("reset-layout", "Reset layout", { indent: true });
     sep();
     add("refresh", "Refresh", { indent: true });

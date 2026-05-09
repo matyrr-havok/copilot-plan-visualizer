@@ -120,39 +120,51 @@ function sniffMode(css) {
 }
 
 // ---- DB reader ------------------------------------------------------------
-function openDb(dbPath) {
-    if (!DatabaseCtor) return { db: null, error: dbLoadError ? `better-sqlite3 not loaded: ${dbLoadError}` : "no DB ctor" };
-    if (!dbPath) return { db: null, error: "no workspace path" };
-    if (!existsSync(dbPath)) return { db: null, error: `db file does not exist: ${dbPath}` };
-    try {
-        return { db: new DatabaseCtor(dbPath, { readonly: true, fileMustExist: true, timeout: 2000 }), error: null };
-    } catch (e) {
-        return { db: null, error: `failed to open ${dbPath}: ${e.message}` };
-    }
-}
-
+//
+// Distinguishes three states for the page:
+//   • available === false → better-sqlite3 not loaded (install issue)
+//   • dbMissing === true  → no session DB yet (not an error — agent just
+//     hasn't created the DB or the todos/todo_deps tables yet). The page
+//     shows a friendly empty-state message instead of a technical error.
+//   • error !== null      → an actual SQLite or open-time failure.
 function readTodos(dbPath) {
-    const { db, error: openError } = openDb(dbPath);
-    if (!db) return { todos: [], deps: [], available: !!DatabaseCtor, error: openError };
+    if (!DatabaseCtor) {
+        return { todos: [], deps: [], available: false, dbMissing: false, error: null };
+    }
+    if (!dbPath || !existsSync(dbPath)) {
+        // No session.db on disk yet (or no workspace path at all).
+        return { todos: [], deps: [], available: true, dbMissing: true, error: null };
+    }
+    let db;
+    try {
+        db = new DatabaseCtor(dbPath, { readonly: true, fileMustExist: true, timeout: 2000 });
+    } catch (e) {
+        return { todos: [], deps: [], available: true, dbMissing: false, error: `failed to open ${dbPath}: ${e.message}` };
+    }
     try {
         let todos = [];
         let deps = [];
         let queryError = null;
+        let todosTableMissing = false;
+        let depsTableMissing = false;
         try {
             // Use SELECT * to tolerate schema variations (the per-session
             // DB schema is created on first use of the SQL tool).
             todos = db.prepare("SELECT * FROM todos").all();
         } catch (e) {
-            queryError = `todos query failed: ${e.message}`;
+            if (/no such table/i.test(e.message)) todosTableMissing = true;
+            else queryError = `to-dos query failed: ${e.message}`;
         }
         try {
             deps = db.prepare("SELECT todo_id, depends_on FROM todo_deps").all();
         } catch (e) {
-            queryError = (queryError ? queryError + "; " : "") + `deps query failed: ${e.message}`;
+            if (/no such table/i.test(e.message)) depsTableMissing = true;
+            else queryError = (queryError ? queryError + "; " : "") + `deps query failed: ${e.message}`;
         }
-        return { todos, deps, available: true, error: queryError };
-    } catch (e) {
-        return { todos: [], deps: [], available: true, error: e.message };
+        // If both tables are missing, the DB exists but the SQL tool
+        // hasn't initialised the default schema yet — same UX as no DB.
+        const dbMissing = todosTableMissing && depsTableMissing;
+        return { todos, deps, available: true, dbMissing, error: queryError };
     } finally {
         try { db.close(); } catch {}
     }
@@ -221,6 +233,7 @@ async function buildState() {
         deps: todoState.deps,
         todosAvailable: todoState.available,
         todosError: todoState.error || (dbLoadError ? `better-sqlite3 not loaded: ${dbLoadError}` : null),
+        todosDbMissing: !!todoState.dbMissing,
         todosDbPath: dbPath,
         session: {
             id: cachedSessionInfo?.sessionId || null,
@@ -404,7 +417,7 @@ cachedSessionInfo = {
 };
 
 if (dbLoadError) {
-    await session.log(`plan-visualizer: better-sqlite3 not available — todos will be unavailable. (${dbLoadError})`, { level: "warning" }).catch(() => {});
+    await session.log(`plan-visualizer: better-sqlite3 not available — to-dos will be unavailable. (${dbLoadError})`, { level: "warning" }).catch(() => {});
 }
 
 // Subscribe to plan-change events. operation === "create" auto-opens the window.
