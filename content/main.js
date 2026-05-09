@@ -17,6 +17,24 @@ const liveDot = document.getElementById("live-dot");
 const refreshBtn = document.getElementById("refresh-btn");
 const activeStyleEl = document.getElementById("active-theme");
 
+const DEFAULT_TITLE = "Plan Visualizer";
+let lastAppliedTitle = null;
+
+// Push a new native window title. webview2/wry doesn't propagate
+// document.title to the OS title bar, so we also send an IPC message
+// the child process turns into a win.setTitle() call. See
+// lib/webview-child.mjs for the receiving side.
+function setWindowTitle(title) {
+    if (title === lastAppliedTitle) return;
+    lastAppliedTitle = title;
+    document.title = title;
+    try {
+        if (window.ipc && typeof window.ipc.postMessage === "function") {
+            window.ipc.postMessage(JSON.stringify({ type: "setTitle", value: title }));
+        }
+    } catch { /* best-effort */ }
+}
+
 let lastVersion = -1;
 let lastState = null;
 
@@ -102,6 +120,14 @@ function applyState(state) {
     }
     const branchPart = sess.branch ? `[⎇ ${sess.branch}]` : "";
     cwdInfoEl.textContent = [sess.cwd || "", branchPart].filter(Boolean).join(" ");
+
+    // Native window title — bootstrapped at spawn time by the extension
+    // (see refreshWindowTitle in main.mjs); kept in sync here while the
+    // window is open. Mirror's main.mjs's "<name> - <BASE_TITLE>" formula.
+    // Only push when we have a name so a transient null from readWorkspaceName
+    // (e.g. mid-rewrite of workspace.yaml) doesn't flicker the OS title back
+    // to the bare default. The bootstrap covers the real "no name" startup case.
+    if (name) setWindowTitle(`${name} - ${DEFAULT_TITLE}`);
 
     // Plan — content + tooltip on the header. The "Updated HH:MM:SS" label
     // is set only when the plan hash actually changes.

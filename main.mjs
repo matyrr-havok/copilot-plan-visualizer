@@ -357,10 +357,11 @@ const webview = new CopilotWebview({
     },
 });
 
-// Compose the native window title from the current session name. WebView2
-// can't change the title of an already-open window, so this only takes
-// effect on the *next* show(). If the AI regenerates the session summary
-// mid-session, the new title appears the next time the window is opened.
+// Bootstraps the native window title at spawn time so the first paint
+// shows "<session name> - Plan Visualizer" without flashing the bare
+// "Plan Visualizer" placeholder. Live title updates after the window
+// opens are pushed by the page over the wry IPC channel — see
+// `setWindowTitle` in content/main.js.
 function refreshWindowTitle() {
     const name = readWorkspaceName(cachedSessionInfo?.workspacePath);
     webview.title = name ? `${name} - ${BASE_TITLE}` : BASE_TITLE;
