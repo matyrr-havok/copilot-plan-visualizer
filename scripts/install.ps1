@@ -5,9 +5,12 @@
 .DESCRIPTION
     Copies the extension into the appropriate Copilot CLI extension discovery
     directory so it is ready to load on the next Copilot CLI session start.
-    Dependencies are installed automatically by the extension's own bootstrap
-    on first launch (so the native better-sqlite3 binary is built/fetched
-    against the CLI's embedded Node ABI, not your system Node).
+
+    By default the script also runs `npm install --omit=dev` against the
+    installed copy so first launch is instantaneous. Pass -SkipDepsInstall
+    (or run on a host without `npm` on PATH) to defer dependency install to
+    the extension's own bootstrap on first launch — that path adds a 10-30s
+    window where `/plan-visualizer` isn't yet registered.
 
     By default the script installs from the local working tree it lives in
     (whatever you currently have checked out, modified or not). Pass
@@ -38,6 +41,12 @@
 .PARAMETER Force
     Overwrite an existing install at the target path.
 
+.PARAMETER SkipDepsInstall
+    Skip the post-copy `npm install --omit=dev` step. The extension's own
+    bootstrap will then install dependencies on first launch instead, which
+    leaves a 10-30 second window where the `/plan-visualizer` slash command
+    is not yet registered with Copilot CLI.
+
 .EXAMPLE
     # Install for the current project, from the local working tree
     .\install.ps1
@@ -62,7 +71,8 @@ param(
     [switch]$FromGitHub,
     [string]$Ref,
     [string]$RepoUrl,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipDepsInstall
 )
 
 Set-StrictMode -Version Latest
@@ -195,8 +205,10 @@ function Install-FromLocal {
     New-Item -ItemType Directory -Path $Target -Force | Out-Null
     # Robocopy ships with Windows. /E = subdirs incl. empty. Exclusions match
     # .gitignore + transient build artefacts. Exit codes 0..7 indicate success.
+    # NB: package-lock.json is intentionally INCLUDED so the installed copy
+    # matches what `npm install` will validate against in Install-Dependencies.
     $excludeDirs = @('node_modules', '.git', '.vs', '.vscode', '.idea', '.copilot')
-    $excludeFiles = @('package-lock.json', '*.log')
+    $excludeFiles = @('*.log')
     $args = @($Source, $Target, '/E', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/NS', '/NC',
               '/XD') + $excludeDirs + @('/XF') + $excludeFiles
     & robocopy @args | Out-Null
@@ -205,6 +217,152 @@ function Install-FromLocal {
     # consumer doesn't misread the value. Script-scope only — don't pollute global.
     $script:LASTEXITCODE = 0
     Write-Ok "Copied."
+}
+
+function Get-CopilotEmbeddedNodeVersion {
+    # Copilot CLI ships a Single-Executable-Application binary with an
+    # embedded Node runtime whose major version may differ from `node` on
+    # PATH. better-sqlite3's prebuild-install needs the embedded Node's
+    # version (or at least major) so the fetched `.node` binary's
+    # NODE_MODULE_VERSION matches the runtime that will dlopen() it.
+    #
+    # We collect every `vXX.YY.ZZ` literal with a Node-shaped major (20-99)
+    # and return the most frequent. The actual embedded runtime version is
+    # repeated many times (~13 in the current 124 MB binary) while stray
+    # deprecation/library literals (e.g. "deprecated since v20.0.0") appear
+    # only once, so frequency reliably distinguishes them. We deliberately
+    # do NOT early-exit on the first match: the first occurrence can be a
+    # stray literal in either Node's .rdata or in the SEA-bundled JS, and
+    # would silently land an ABI-incompatible better-sqlite3.
+    param([string]$NpmExePath)
+
+    # Resolve candidate copilot.exe paths. Prefer `npm root -g` when we have
+    # an npm binary so we cover Volta / Scoop / Chocolatey / pnpm-as-npm /
+    # other prefix-overriding installs in addition to the two hardcoded
+    # defaults.
+    $candidates = @()
+    if ($NpmExePath -and (Test-Path -LiteralPath $NpmExePath)) {
+        try {
+            $globalRoot = (& $NpmExePath root -g 2>$null | Select-Object -Last 1)
+            if ($globalRoot) {
+                $candidates += Join-Path $globalRoot.Trim() '@github\copilot\node_modules\@github\copilot-win32-x64\copilot.exe'
+            }
+        } catch { }
+    }
+    $candidates += Join-Path $env:APPDATA      'npm\node_modules\@github\copilot\node_modules\@github\copilot-win32-x64\copilot.exe'
+    $candidates += Join-Path $env:ProgramFiles 'nodejs\node_modules\@github\copilot\node_modules\@github\copilot-win32-x64\copilot.exe'
+    $bin = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $bin) { return $null }
+
+    $stream = $null
+    $counts = @{}
+    try {
+        $stream = [System.IO.File]::OpenRead($bin)
+        $buf = New-Object byte[] (4MB)
+        # GetEncoding(28591) is ISO-8859-1, equivalent to .NET 5+'s
+        # `Encoding.Latin1` static property but available on Windows
+        # PowerShell 5.1 (.NET Framework 4.x) too. Maps every byte 0..255 to
+        # its Unicode codepoint, so binary data round-trips losslessly.
+        $enc = [System.Text.Encoding]::GetEncoding(28591)
+        # Major range covers Node 20..99 (Copilot CLI requires 22+); the
+        # `(?!\d)` boundary stops greedy `\d+` from splicing the next byte
+        # onto the patch number when the literal isn't followed by a NUL.
+        $re = [regex]'v([2-9]\d)\.\d+\.\d+(?!\d)'
+        while (($n = $stream.Read($buf, 0, $buf.Length)) -gt 0) {
+            $text = $enc.GetString($buf, 0, $n)
+            foreach ($m in $re.Matches($text)) {
+                $v = $m.Value.Substring(1)
+                if ($counts.ContainsKey($v)) { $counts[$v]++ } else { $counts[$v] = 1 }
+            }
+        }
+    } catch { return $null }
+    finally {
+        if ($stream) { $stream.Dispose() }
+    }
+
+    if ($counts.Count -eq 0) { return $null }
+    $ranked = @($counts.GetEnumerator() | Sort-Object Value -Descending)
+    # Refuse to guess if the top two are tied — that's a strong signal we're
+    # looking at unrelated literals rather than the actual runtime version.
+    if ($ranked.Count -ge 2 -and $ranked[0].Value -eq $ranked[1].Value) {
+        return $null
+    }
+    return $ranked[0].Key
+}
+
+function Install-Dependencies {
+    param([string]$Target)
+    # Pre-installing the npm deps at install time means the extension's own
+    # bootstrap (lib/copilot-webview.js's `bootstrap()`) becomes a no-op on
+    # first launch, so joinSession() runs immediately and the
+    # `/plan-visualizer` slash command is registered before the user can
+    # invoke it. Without this, there's a 10-30 second window during the
+    # first-launch `npm install` where Copilot CLI may report
+    # "Unknown command: plan-visualizer" even though the window eventually
+    # opens via the queued-command retry path.
+    #
+    # We deliberately resolve `npm.cmd` (or `npm` Application) rather than
+    # let `&` invoke the bare `npm` name: the system-shipped `npm.ps1`
+    # wrapper has a long-standing bug where `& npm install` parses the
+    # arg list one character short and forwards `pm install` to npm-cli.js,
+    # which then fails with "Unknown command: pm". Resolving the Application
+    # entry directly bypasses the .ps1 wrapper entirely.
+    $npmExe = Get-Command npm -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1
+    if (-not $npmExe) {
+        Write-Warn2 "npm.cmd / npm Application not found on PATH; skipping post-install dep install."
+        Write-Warn2 "Extension's own bootstrap will run 'npm install' on first launch."
+        return $false
+    }
+    Write-Step "Installing Node dependencies in $Target ($($npmExe.Source) install --omit=dev)"
+    # Match extension.mjs's env so prebuild-install fetches the binary built
+    # against the right Node ABI. Copilot CLI bundles its own Node into
+    # copilot.exe (currently 24.x), which can differ from the user's `node`
+    # on PATH (Copilot only requires 22+). Using the system Node version
+    # would land a NODE_MODULE_VERSION-incompatible better-sqlite3 binary.
+    $prevRuntime = $env:npm_config_runtime
+    $prevTarget  = $env:npm_config_target
+    $env:npm_config_runtime = 'node'
+    try {
+        $embedded = Get-CopilotEmbeddedNodeVersion -NpmExePath $npmExe.Source
+        if ($embedded) {
+            Write-Ok "Detected Copilot CLI embedded Node version: $embedded"
+            $env:npm_config_target = $embedded
+        } else {
+            try {
+                $env:npm_config_target = (& node -p "process.versions.node").Trim()
+                Write-Warn2 "Could not detect embedded Copilot CLI Node version; falling back to system Node ($env:npm_config_target). If first launch reports a NODE_MODULE_VERSION mismatch, rerun with the extension's own bootstrap (delete node_modules and let first launch install)."
+            } catch {
+                Write-Warn2 "Could not determine any Node version; using prebuild-install default."
+            }
+        }
+        Push-Location $Target
+        try {
+            & $npmExe.Source install --omit=dev --no-audit --no-fund --no-progress 2>&1 |
+                ForEach-Object { Write-Host "    $_" }
+            if ($LASTEXITCODE -ne 0) { throw "npm install failed (exit $LASTEXITCODE)" }
+            # Force lock.mtime > pkg.mtime so the extension's bootstrap on
+            # first launch definitely treats this install as fresh. npm
+            # install does NOT touch the lock file when the lock is already
+            # internally consistent (e.g., during an upgrade where lock and
+            # package.json are in sync). Without this touch, robocopy's
+            # preserved source-mtimes can leave lock.mtime older than
+            # pkg.mtime, making bootstrap re-run npm install on first
+            # launch and re-introducing the slash-command race we're here
+            # to fix.
+            $lockPath = Join-Path $Target 'package-lock.json'
+            if (Test-Path -LiteralPath $lockPath) {
+                (Get-Item -LiteralPath $lockPath).LastWriteTime = Get-Date
+            }
+        } finally {
+            Pop-Location
+        }
+    } finally {
+        $env:npm_config_runtime = $prevRuntime
+        $env:npm_config_target  = $prevTarget
+    }
+    Write-Ok "Dependencies installed."
+    return $true
 }
 
 function Install-FromGit {
@@ -323,6 +481,16 @@ try {
     Restore-UserThemes -Target $target -Backup $themesBackup
     # Restored successfully; cancel the finally-block recovery hint.
     $themesBackup = $null
+
+    # Pre-install npm deps so the extension's bootstrap is a no-op on first
+    # launch (eliminates the race where `/plan-visualizer` isn't yet
+    # registered while npm install is running).
+    $depsInstalled = $false
+    if (-not $SkipDepsInstall) {
+        $depsInstalled = Install-Dependencies -Target $target
+    } else {
+        Write-Warn2 "Skipping post-install dep install (-SkipDepsInstall)."
+    }
 } finally {
     if ($themesBackup -and (Test-Path $themesBackup)) {
         Write-Warn2 ""
@@ -336,11 +504,15 @@ Write-Host ""
 Write-Host "✅ copilot-plan-visualizer installed at:" -ForegroundColor Green
 Write-Host "   $target"
 Write-Host ""
-Write-Host "Note: Node dependencies are NOT installed by this script." -ForegroundColor Yellow
-Write-Host "      The extension's own bootstrap will run 'npm install' on first launch,"
-Write-Host "      under the Copilot CLI's embedded Node so the native better-sqlite3"
-Write-Host "      binary lands the right ABI. First launch may take 10-30 seconds."
-Write-Host ""
+if (-not $depsInstalled) {
+    Write-Host "Note: Node dependencies are NOT installed yet." -ForegroundColor Yellow
+    Write-Host "      The extension's own bootstrap will run 'npm install' on first launch,"
+    Write-Host "      under the Copilot CLI's embedded Node so the native better-sqlite3"
+    Write-Host "      binary lands the right ABI. First launch may take 10-30 seconds, and"
+    Write-Host "      the /plan-visualizer slash command may not be available until it"
+    Write-Host "      finishes."
+    Write-Host ""
+}
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Open Copilot CLI in $(if ($Scope -eq 'Project') { "the project '$ProjectPath'" } else { 'any git repo' })."
 Write-Host "  2. Run /reload-extensions  (or restart Copilot CLI)."
