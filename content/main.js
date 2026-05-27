@@ -659,7 +659,7 @@ contextMenu.addEventListener("click", async (e) => {
 
     if (action === "refresh") {
         hideContextMenu();
-        await pullState();
+        await pullState({ force: true });
         return;
     }
     if (action === "reset-layout") {
@@ -732,9 +732,9 @@ window.addEventListener("resize", () => {
 
 // ---- Boot ---------------------------------------------------------------
 
-async function pullState() {
+async function pullState({ force = false } = {}) {
     try {
-        const state = await copilot.getState();
+        const state = force ? await copilot.requestRefresh() : await copilot.getState();
         applyState(state);
     } catch (e) {
         // The page logs to the extension via copilot.log instead of
@@ -744,7 +744,7 @@ async function pullState() {
     }
 }
 
-refreshBtn.addEventListener("click", pullState);
+refreshBtn.addEventListener("click", () => pullState({ force: true }));
 
 (async () => {
     await initTheme();

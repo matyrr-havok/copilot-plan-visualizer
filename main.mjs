@@ -13,7 +13,7 @@ import { joinSession } from "@github/copilot-sdk/extension";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, watchFile, unwatchFile } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { CopilotWebview } from "./lib/copilot-webview.js";
 
 const require = createRequire(import.meta.url);
@@ -247,14 +247,30 @@ async function buildState() {
 }
 
 async function safeReadPlan() {
+    const diskPath = cachedSessionInfo?.workspacePath
+        ? join(cachedSessionInfo.workspacePath, "plan.md")
+        : null;
+
+    if (diskPath) {
+        try {
+            return { exists: true, content: readFileSync(diskPath, "utf8"), path: diskPath };
+        } catch (e) {
+            if (e?.code !== "ENOENT" && e?.code !== "ENOTDIR") {
+                try { await session.log(`plan-visualizer: failed to read plan from ${diskPath} (${e.message})`, { level: "warning" }); } catch {}
+                return { exists: false, content: null, path: diskPath };
+            }
+        }
+    }
+
     if (!session?.rpc?.plan?.read) {
-        return { exists: false, content: null, path: null };
+        return { exists: false, content: null, path: diskPath };
     }
     try {
         const r = await session.rpc.plan.read();
-        return { exists: !!r?.exists, content: r?.content ?? null, path: r?.path ?? null };
+        const content = r?.content ?? null;
+        return { exists: !!r?.exists || content !== null, content, path: r?.path ?? diskPath };
     } catch {
-        return { exists: false, content: null, path: null };
+        return { exists: false, content: null, path: diskPath };
     }
 }
 
@@ -274,9 +290,9 @@ function schedulePush() {
             const state = await buildState();
             const h = hashOf(state);
             if (h === lastPushedHash) return;
-            lastPushedHash = h;
             const code = `window.__plan?.update?.(${JSON.stringify(state)})`;
-            await webview.eval(code, { timeoutMs: 2000 }).catch(() => {});
+            await webview.eval(code, { timeoutMs: 2000 });
+            lastPushedHash = h;
         } catch (e) {
             try { await session.log(`plan-visualizer: pushState failed (${e.message})`, { level: "warning" }); } catch {}
         }
@@ -345,7 +361,10 @@ const webview = new CopilotWebview({
     height: 760,
     callbacks: {
         getState: async () => buildState(),
-        requestRefresh: async () => buildState(),
+        requestRefresh: async () => {
+            lastPushedHash = "";
+            return buildState();
+        },
         listThemes: () => listThemes(),
         getInitialTheme: () => readPersistedState().theme || null,
         setThemeChoice: ({ name, mode } = {}) => {
